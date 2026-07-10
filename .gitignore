@@ -1,0 +1,21 @@
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Data (tracked by DVC instead of git)
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+
+# MLflow / model artifacts
+mlruns/
+models/*
+!models/.gitkeep
+
+# Evidently reports
+reports/
+
+# OS
+.DS_Store

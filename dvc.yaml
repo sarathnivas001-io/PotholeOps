@@ -1,0 +1,33 @@
+stages:
+  prepare:
+    cmd: python src/data/prepare.py
+    deps:
+      - src/data/prepare.py
+      - data/raw
+    params:
+      - prepare.val_split
+      - prepare.test_split
+      - prepare.img_size
+      - prepare.seed
+    outs:
+      - data/processed
+
+  train:
+    cmd: python src/training/train.py
+    deps:
+      - src/training/train.py
+      - data/processed
+    params:
+      - train.epochs
+      - train.batch_size
+      - train.learning_rate
+      - train.backbone
+      - train.num_classes
+      - train.early_stopping_patience
+      - registry.model_name
+      - registry.promote_threshold_f1
+    outs:
+      - models/latest_model.pt
+    metrics:
+      - metrics/train_metrics.json:
+          cache: false

@@ -1,0 +1,17 @@
+prepare:
+  val_split: 0.15
+  test_split: 0.15
+  img_size: 224
+  seed: 42
+
+train:
+  epochs: 15
+  batch_size: 32
+  learning_rate: 0.0003
+  backbone: resnet18       # torchvision pretrained backbone
+  num_classes: 3            # low, medium, high
+  early_stopping_patience: 4
+
+registry:
+  model_name: potholeops-classifier
+  promote_threshold_f1: 0.85   # only promote to Production if val F1 >= this

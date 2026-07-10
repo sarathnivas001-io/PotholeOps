@@ -1,0 +1,57 @@
+name: Retrain and Deploy
+
+on:
+  push:
+    paths:
+      - "data/raw.dvc"        # triggers when the DVC-tracked dataset pointer changes
+      - "src/**"
+      - "params.yaml"
+  workflow_dispatch: {}       # allow manual trigger from the Actions tab
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Pull data with DVC
+        run: |
+          dvc remote add -d storage ${{ secrets.DVC_REMOTE_URL }} --force
+          dvc pull
+
+      - name: Reproduce pipeline (prepare -> train)
+        run: dvc repro
+
+      - name: Show metrics
+        run: dvc metrics show
+
+      - name: Push updated artifacts to DVC remote
+        run: dvc push
+
+      - name: Log in to Docker Hub
+        if: success()
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/potholeops-api:latest
+
+      # Optional: trigger redeploy on your hosting target (Render/Fly.io/etc.)
+      # - name: Trigger redeploy
+      #   run: curl -X POST "${{ secrets.DEPLOY_HOOK_URL }}"
