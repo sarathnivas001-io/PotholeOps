@@ -1,4 +1,5 @@
 # PotholeOps
+<<<<<<< HEAD
 
 End-to-end MLOps pipeline for automated road pothole severity classification
 (Low / Medium / High), with continuous retraining, model versioning, and
@@ -91,3 +92,6 @@ image.
 This is a **working scaffold**, not a finished product — the CNN
 architecture, dataset paths, and thresholds are starting points you should
 tune once you have real data. See inline `TODO`s in each file.
+=======
+MLOps Project
+>>>>>>> 833bcd293de3516ebcdaac9d0a764b2a12df6ade
