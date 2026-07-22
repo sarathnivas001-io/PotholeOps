@@ -24,3 +24,34 @@ stages:
       md5: 119dc690cfeb941356f41153e3c973d3.dir
       size: 350240206
       nfiles: 665
+  train:
+    cmd: python src/training/train.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 119dc690cfeb941356f41153e3c973d3.dir
+      size: 350240206
+      nfiles: 665
+    - path: src/training/train.py
+      hash: md5
+      md5: 6c8e32c9112a7130090bb8063f37fb51
+      size: 7186
+    params:
+      params.yaml:
+        registry.model_name: potholeops-classifier
+        registry.promote_threshold_f1: 0.85
+        train.backbone: resnet18
+        train.batch_size: 32
+        train.early_stopping_patience: 4
+        train.epochs: 15
+        train.learning_rate: 0.0003
+        train.num_classes: 3
+    outs:
+    - path: metrics/train_metrics.json
+      hash: md5
+      md5: ef6587356d07a2fa30f881e79cf824b4
+      size: 69
+    - path: models/latest_model.pt
+      hash: md5
+      md5: b9d624e36626dbd71acc2e00acdc8f9d
+      size: 44790475

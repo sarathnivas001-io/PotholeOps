@@ -154,7 +154,13 @@ def main():
         )
 
         # Log + register with MLflow
-        mlflow.pytorch.log_model(model, artifact_path="model")
+        input_example = torch.randn(1, 3, 224, 224)
+        mlflow.pytorch.log_model(
+            model,
+            artifact_path="model",
+            input_example=input_example,
+            serialization_format="pickle"
+        )
         model_uri = f"runs:/{run.info.run_id}/model"
         registered = mlflow.register_model(model_uri, reg_p["model_name"])
 
