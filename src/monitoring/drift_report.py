@@ -16,10 +16,11 @@ Output: reports/drift_report.html
 import json
 from collections import Counter
 from pathlib import Path
+from unittest import result
 
 import pandas as pd
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+from evidently import Report
+from evidently.presets import DataDriftPreset
 
 LOG_PATH = Path("logs/predictions.jsonl")
 VAL_DIR = Path("data/processed/val")
@@ -63,16 +64,21 @@ def main():
     print(f"Baseline distribution (val set): {dict(ref_counts)}")
     print(f"Current distribution ({len(current)} predictions): {dict(cur_counts)}")
 
-    report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=reference, current_data=current)
+    report = Report([DataDriftPreset()])
+    my_eval = report.run(current, reference)
 
     REPORTS_DIR.mkdir(exist_ok=True)
     out_path = REPORTS_DIR / "drift_report.html"
-    report.save_html(str(out_path))
+    my_eval.save_html(str(out_path))
     print(f"Drift report written to {out_path}")
 
-    result = report.as_dict()
-    drift_detected = result["metrics"][0]["result"].get("dataset_drift", False)
+    
+
+    result = my_eval.dict()
+    
+    print(json.dumps(result, indent=2, default=str))
+    drift_share = result["metrics"][0]["value"]["share"]
+    drift_detected = drift_share > 0.5
     print(f"Dataset drift detected: {drift_detected}")
 
     # Machine-readable summary for the dashboard / CI
