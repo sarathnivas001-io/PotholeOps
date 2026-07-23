@@ -1,78 +1,54 @@
 """
 dashboard/app.py
 
-Streamlit dashboard with two tabs:
-  1. Live Inference — upload a pothole image, call the FastAPI /predict endpoint
-  2. Drift Monitoring — show the latest Evidently drift report + summary
+PotholeOps Web Dashboard Launcher:
+  1. Checks if the FastAPI backend service is running on http://localhost:8000
+  2. Starts the FastAPI uvicorn server if not already running
+  3. Opens http://localhost:8000/ directly in your web browser
 
-Run: streamlit run dashboard/app.py
-Expects the FastAPI service running at API_URL (default http://localhost:8000).
+Run: python dashboard/app.py
 """
-import json
-from pathlib import Path
 
+import os
+import sys
+import time
+import webbrowser
 import requests
-import streamlit as st
+import uvicorn
 
-API_URL = "http://localhost:8000"
-REPORTS_DIR = Path("reports")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-st.set_page_config(page_title="PotholeOps Dashboard", layout="wide")
-st.title("🕳️ PotholeOps — Pothole Severity Monitoring")
 
-tab_infer, tab_drift = st.tabs(["Live Inference", "Drift Monitoring"])
+def check_api_running() -> bool:
+    """Check if FastAPI service is online."""
+    try:
+        res = requests.get(f"{API_URL}/health", timeout=2)
+        return res.status_code == 200
+    except Exception:
+        return False
 
-with tab_infer:
-    st.subheader("Upload a road image for severity classification")
-    uploaded = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
 
-    if uploaded:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(uploaded, caption="Uploaded image", use_container_width=True)
+def main():
+    print(f"PotholeOps Modern Web Dashboard Launcher")
+    print(f"Connecting to FastAPI backend at {API_URL}...")
 
-        with col2:
-            with st.spinner("Calling inference API..."):
-                try:
-                    response = requests.post(
-                        f"{API_URL}/predict",
-                        files={"file": (uploaded.name, uploaded.getvalue(), uploaded.type)},
-                        timeout=15,
-                    )
-                    response.raise_for_status()
-                    result = response.json()
+    if not check_api_running():
+        print("FastAPI server is not running. Starting uvicorn server...")
+        # Open web browser after a brief delay
+        def launch_browser():
+            time.sleep(1.5)
+            print(f"Opening dashboard in browser at {API_URL}...")
+            webbrowser.open(API_URL)
 
-                    st.metric("Predicted severity", result["prediction"].upper())
-                    st.metric("Confidence", f"{result['confidence'] * 100:.1f}%")
-                    st.bar_chart(result["class_probabilities"])
-                except requests.exceptions.ConnectionError:
-                    st.error(f"Could not reach the API at {API_URL}. "
-                             f"Start it with: uvicorn src.api.main:app --port 8000")
-                except Exception as e:
-                    st.error(f"Prediction failed: {e}")
+        import threading
+        threading.Thread(target=launch_browser, daemon=True).start()
 
-with tab_drift:
-    st.subheader("Prediction drift vs. validation baseline")
-    st.caption("Generate a fresh report with: `python src/monitoring/drift_report.py`")
-
-    summary_path = REPORTS_DIR / "drift_summary.json"
-    report_path = REPORTS_DIR / "drift_report.html"
-
-    if summary_path.exists():
-        summary = json.loads(summary_path.read_text())
-        drift_flag = summary["drift_detected"]
-        st.error("⚠️ Drift detected") if drift_flag else st.success("✅ No significant drift")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Baseline (validation set) distribution**")
-            st.bar_chart(summary["reference_counts"])
-        with col2:
-            st.write("**Current (live) prediction distribution**")
-            st.bar_chart(summary["current_counts"])
+        # Run uvicorn server
+        uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
     else:
-        st.info("No drift report yet. Run the drift monitoring script first.")
+        print(f"FastAPI server is already running! Opening {API_URL} in web browser...")
+        webbrowser.open(API_URL)
 
-    if report_path.exists():
-        with st.expander("Full Evidently AI report"):
-            st.components.v1.html(report_path.read_text(), height=800, scrolling=True)
+
+if __name__ == "__main__":
+    main()

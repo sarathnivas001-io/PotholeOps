@@ -31,3 +31,16 @@ def test_predict_rejects_non_image():
         files={"file": ("test.txt", b"not an image", "text/plain")},
     )
     assert response.status_code == 400
+
+
+def test_dashboard_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "PotholeOps" in response.text
+
+
+def test_get_logs():
+    response = client.get("/api/logs")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
