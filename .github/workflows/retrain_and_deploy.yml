@@ -23,13 +23,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Configure DVC Google Drive service account
-        run: |
-          echo '${{ secrets.GDRIVE_SA_CREDENTIALS }}' > gdrive-sa.json
-          dvc remote modify myremote --local gdrive_use_service_account true
-          dvc remote modify myremote --local gdrive_service_account_json_file_path gdrive-sa.json
-
       - name: Pull data with DVC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
         run: dvc pull
 
       - name: Reproduce pipeline (prepare -> train)
@@ -41,4 +38,7 @@ jobs:
         run: dvc metrics show
 
       - name: Push updated artifacts to DVC remote
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
         run: dvc push
