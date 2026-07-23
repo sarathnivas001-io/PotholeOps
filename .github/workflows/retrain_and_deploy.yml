@@ -23,12 +23,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Pull data with DVC
+      - name: Configure DVC Google Drive service account
         run: |
-          dvc remote add -d storage ${{ secrets.DVC_REMOTE_URL }} --force
-          dvc pull
+          echo '${{ secrets.GDRIVE_SA_CREDENTIALS }}' > gdrive-sa.json
+          dvc remote modify myremote --local gdrive_use_service_account true
+          dvc remote modify myremote --local gdrive_service_account_json_file_path gdrive-sa.json
+
+      - name: Pull data with DVC
+        run: dvc pull
 
       - name: Reproduce pipeline (prepare -> train)
+        env:
+          MLFLOW_ALLOW_FILE_STORE: "true"
         run: dvc repro
 
       - name: Show metrics
@@ -36,22 +42,3 @@ jobs:
 
       - name: Push updated artifacts to DVC remote
         run: dvc push
-
-      - name: Log in to Docker Hub
-        if: success()
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push image
-        if: success()
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/potholeops-api:latest
-
-      # Optional: trigger redeploy on your hosting target (Render/Fly.io/etc.)
-      # - name: Trigger redeploy
-      #   run: curl -X POST "${{ secrets.DEPLOY_HOOK_URL }}"
