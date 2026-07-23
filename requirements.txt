@@ -14,3 +14,5 @@ requests>=2.31
 pyyaml>=6.0
 pytest>=8.2
 dvc-gdrive>=3.0
+pyOpenSSL==24.2.1
+cryptography==43.0.3
