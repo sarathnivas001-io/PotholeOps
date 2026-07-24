@@ -8,15 +8,3 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./reports:/app/reports
-
-  dashboard:
-    build: .
-    command: python dashboard/app.py
-    ports:
-      - "8501:8501"
-    depends_on:
-      - api
-    volumes:
-      - ./reports:/app/reports
-    environment:
-      - API_URL=http://api:8000

@@ -14,6 +14,7 @@ COPY src/ src/
 COPY params.yaml .
 COPY models/ models/
 COPY mlruns/ mlruns/
+COPY dashboard/ dashboard/
 
 EXPOSE 8000
 
