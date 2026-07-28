@@ -58,6 +58,16 @@ def build_dataloaders(img_size: int, batch_size: int):
     return train_loader, val_loader, train_ds.classes
 
 
+def compute_class_weights(train_ds) -> torch.Tensor:
+    """Inverse-frequency weights so minority classes count more in the loss."""
+    class_counts = torch.zeros(len(train_ds.classes))
+    for _, label in train_ds.samples:
+        class_counts[label] += 1
+    weights = 1.0 / class_counts
+    weights = weights / weights.sum() * len(train_ds.classes)  # normalize
+    return weights
+
+
 def build_model(backbone: str, num_classes: int) -> nn.Module:
     if backbone == "resnet18":
         model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
@@ -67,7 +77,7 @@ def build_model(backbone: str, num_classes: int) -> nn.Module:
     return model.to(DEVICE)
 
 
-def evaluate(model, loader) -> dict:
+def evaluate(model, loader, class_names) -> dict:
     model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
@@ -77,9 +87,11 @@ def evaluate(model, loader) -> dict:
             preds = logits.argmax(dim=1).cpu().numpy()
             all_preds.extend(preds)
             all_labels.extend(y.numpy())
+    per_class_f1 = f1_score(all_labels, all_preds, average=None, labels=range(len(class_names)))
     return {
         "accuracy": accuracy_score(all_labels, all_preds),
         "f1_macro": f1_score(all_labels, all_preds, average="macro"),
+        "f1_per_class": dict(zip(class_names, per_class_f1.tolist())),
     }
 
 
@@ -96,6 +108,8 @@ def main():
     train_loader, val_loader, class_names = build_dataloaders(
         img_size=params["prepare"]["img_size"], batch_size=train_p["batch_size"]
     )
+    class_weights = compute_class_weights(train_loader.dataset).to(DEVICE)
+    print(f"Class weights: {dict(zip(class_names, class_weights.tolist()))}")
 
     mlflow.set_tracking_uri("file:./mlruns")
     mlflow.set_experiment("potholeops-severity-classification")
@@ -105,7 +119,7 @@ def main():
 
         model = build_model(train_p["backbone"], train_p["num_classes"])
         optimizer = torch.optim.Adam(model.parameters(), lr=train_p["learning_rate"])
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
 
         best_f1 = -1.0
         patience_left = train_p["early_stopping_patience"]
@@ -123,7 +137,7 @@ def main():
                 running_loss += loss.item() * x.size(0)
 
             train_loss = running_loss / len(train_loader.dataset)
-            val_metrics = evaluate(model, val_loader)
+            val_metrics = evaluate(model, val_loader, class_names)
 
             mlflow.log_metrics({
                 "train_loss": train_loss,
@@ -131,7 +145,8 @@ def main():
                 "val_f1_macro": val_metrics["f1_macro"],
             }, step=epoch)
             print(f"epoch {epoch+1}/{train_p['epochs']} "
-                  f"loss={train_loss:.4f} val_f1={val_metrics['f1_macro']:.4f}")
+                  f"loss={train_loss:.4f} val_f1={val_metrics['f1_macro']:.4f} "
+                  f"per_class={val_metrics['f1_per_class']}")
 
             if val_metrics["f1_macro"] > best_f1:
                 best_f1 = val_metrics["f1_macro"]
@@ -157,7 +172,7 @@ def main():
         input_example = torch.randn(1, 3, 224, 224)
         mlflow.pytorch.log_model(
             model,
-            artifact_path="model",
+            name="model",
             input_example=input_example,
             serialization_format="pickle"
         )

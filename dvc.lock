@@ -34,8 +34,8 @@ stages:
       nfiles: 665
     - path: src/training/train.py
       hash: md5
-      md5: 6c8e32c9112a7130090bb8063f37fb51
-      size: 7186
+      md5: 4b0d41538a87e40fabcbe34d29b34f06
+      size: 7993
     params:
       params.yaml:
         registry.model_name: potholeops-classifier
@@ -49,9 +49,9 @@ stages:
     outs:
     - path: metrics/train_metrics.json
       hash: md5
-      md5: ef6587356d07a2fa30f881e79cf824b4
+      md5: 58275c59487237db78775f1d7176cf5c
       size: 69
     - path: models/latest_model.pt
       hash: md5
-      md5: b9d624e36626dbd71acc2e00acdc8f9d
+      md5: a7a21f38196388eaf19be262d1fa1099
       size: 44790475
