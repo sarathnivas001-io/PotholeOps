@@ -5,27 +5,27 @@
   --bg-card-hover: rgba(30, 41, 59, 0.9);
   --border-card: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(99, 102, 241, 0.3);
-  
+
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
-  
+
   --accent-primary: #6366f1;
   --accent-primary-hover: #4f46e5;
   --accent-glow: rgba(99, 102, 241, 0.4);
-  
+
   --color-low: #10b981;
   --color-low-bg: rgba(16, 185, 129, 0.15);
   --color-medium: #f59e0b;
   --color-medium-bg: rgba(245, 158, 11, 0.15);
   --color-high: #ef4444;
   --color-high-bg: rgba(239, 68, 68, 0.15);
-  
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-full: 9999px;
-  
+
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -39,7 +39,7 @@
 body {
   font-family: var(--font-family);
   background-color: var(--bg-dark);
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
   color: var(--text-main);
@@ -179,8 +179,15 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Cards & Layout */
@@ -237,7 +244,8 @@ body {
   justify-content: center;
 }
 
-.drop-zone:hover, .drop-zone.dragover {
+.drop-zone:hover,
+.drop-zone.dragover {
   border-color: var(--accent-primary);
   background: rgba(99, 102, 241, 0.08);
 }
@@ -616,5 +624,45 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* MLflow Navigation Link */
+.mlflow-link,
+.mlflow-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-sm);
+  color: #a5b4fc;
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none !important;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.mlflow-nav-link {
+  margin-left: auto;
+}
+
+.mlflow-link:hover,
+.mlflow-nav-link:hover {
+  background: var(--accent-primary);
+  color: #ffffff !important;
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.mlflow-link svg,
+.mlflow-nav-link svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
 }
