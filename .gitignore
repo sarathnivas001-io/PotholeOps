@@ -21,3 +21,9 @@ reports/
 .DS_Store
 
 logs/
+
+data/incoming/*
+
+*.jpg
+*.png
+.jpeg
