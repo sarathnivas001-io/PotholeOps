@@ -23,6 +23,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from PIL import Image
 from torchvision import transforms
 
@@ -45,6 +46,11 @@ CLASS_NAMES = None
 LOG_PATH = BASE_DIR / "logs" / "predictions.jsonl"
 REPORTS_DIR = BASE_DIR / "reports"
 STATIC_DIR = BASE_DIR / "dashboard" / "static"
+INCOMING_DIR = BASE_DIR / "data" / "incoming"
+INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_RAW_DIR = BASE_DIR / "data" / "raw"
+REVIEWS_LOG_PATH = BASE_DIR / "logs" / "reviews.jsonl"
 
 TRANSFORM = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -67,6 +73,7 @@ def startup():
 # Mount static assets & reports with absolute paths
 app.mount("/dashboard/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/reports", StaticFiles(directory=str(REPORTS_DIR)), name="reports")
+app.mount("/incoming-images", StaticFiles(directory=str(INCOMING_DIR)), name="incoming")
 
 
 @app.get("/")
@@ -92,9 +99,15 @@ async def predict(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
+    image_bytes = await file.read()
+
+    if len(image_bytes) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File too large (max 10MB).")
+
     try:
-        image_bytes = await file.read()
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image = Image.open(io.BytesIO(image_bytes))
+        image.verify()  # confirms it's a genuine, non-corrupted image
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")  # re-open after verify()
     except Exception:
         raise HTTPException(status_code=400, detail="Could not read image file.")
 
@@ -112,11 +125,18 @@ async def predict(file: UploadFile = File(...)):
         },
     }
 
-    # Log every prediction for drift monitoring (src/monitoring/drift_report.py reads this)
+    # Save the image with a safe, server-generated filename (never trust client filenames for paths)
+    import uuid
+    safe_filename = f"{uuid.uuid4().hex}.jpg"
+    saved_path = INCOMING_DIR / safe_filename
+    image.save(saved_path, format="JPEG")
+
+    # Log every prediction for drift monitoring AND for later human review
     with open(LOG_PATH, "a") as f:
         f.write(json.dumps({
             "timestamp": time.time(),
-            "filename": file.filename,
+            "filename": file.filename,       # original name, metadata only
+            "saved_as": safe_filename,          # actual server-side file
             **result,
         }) + "\n")
 
@@ -137,6 +157,83 @@ def get_logs(limit: int = 50):
                 except Exception:
                     pass
     return records[-limit:][::-1]
+
+
+def _get_reviewed_filenames() -> set:
+    if not REVIEWS_LOG_PATH.exists():
+        return set()
+    reviewed = set()
+    with open(REVIEWS_LOG_PATH) as f:
+        for line in f:
+            if line.strip():
+                try:
+                    reviewed.add(json.loads(line)["saved_as"])
+                except Exception:
+                    pass
+    return reviewed
+
+
+@app.get("/api/review-queue")
+def review_queue(limit: int = 20):
+    """Recent predictions that haven't been reviewed/labeled yet."""
+    if not LOG_PATH.exists():
+        return []
+    reviewed = _get_reviewed_filenames()
+    pending = []
+    with open(LOG_PATH) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except Exception:
+                continue
+            saved_as = record.get("saved_as")
+            if saved_as and saved_as not in reviewed and (INCOMING_DIR / saved_as).exists():
+                pending.append({
+                    "saved_as": saved_as,
+                    "original_filename": record.get("filename"),
+                    "prediction": record.get("prediction"),
+                    "confidence": record.get("confidence"),
+                    "timestamp": record.get("timestamp"),
+                    "image_url": f"/incoming-images/{saved_as}",
+                })
+    return pending[-limit:][::-1]
+
+
+class ReviewSubmission(BaseModel):
+    saved_as: str
+    confirmed_label: str  # "low", "medium", or "high"
+
+
+@app.post("/api/review")
+def submit_review(submission: ReviewSubmission):
+    if submission.confirmed_label not in CLASS_NAMES:
+        raise HTTPException(status_code=400, detail=f"Label must be one of {CLASS_NAMES}")
+
+    source_path = INCOMING_DIR / submission.saved_as
+    if not source_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found in incoming queue.")
+
+    # Move the image into the correct class folder under data/raw/
+    dest_dir = DATA_RAW_DIR / submission.confirmed_label
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / submission.saved_as
+    source_path.rename(dest_path)
+
+    # Record that this image has been reviewed (so it drops out of the queue)
+    with open(REVIEWS_LOG_PATH, "a") as f:
+        f.write(json.dumps({
+            "saved_as": submission.saved_as,
+            "confirmed_label": submission.confirmed_label,
+            "reviewed_at": time.time(),
+        }) + "\n")
+
+    return {
+        "status": "ok",
+        "message": f"Image moved to data/raw/{submission.confirmed_label}/. "
+                   f"Run `dvc add data/raw` and commit to include it in the next training run."
+    }
 
 
 def run_drift_script():
