@@ -43,6 +43,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const refreshLogsBtn = document.getElementById("refreshLogsBtn");
   const logsTableBody = document.getElementById("logsTableBody");
 
+  // Review Queue elements
+  const refreshReviewBtn = document.getElementById("refreshReviewBtn");
+  const reviewGrid = document.getElementById("reviewGrid");
+
   let selectedFile = null;
   let probsChartInstance = null;
   let refChartInstance = null;
@@ -62,6 +66,8 @@ document.addEventListener("DOMContentLoaded", () => {
         fetchDriftSummary();
       } else if (tab.dataset.tab === "tab-logs") {
         fetchLogs();
+      } else if (tab.dataset.tab === "tab-review") {
+        fetchReviewQueue();
       }
     });
   });
@@ -398,6 +404,73 @@ document.addEventListener("DOMContentLoaded", () => {
         </tr>
       `;
     }).join("");
+  }
+
+  // --- 8. Human-in-the-Loop Review Queue ---
+  async function fetchReviewQueue() {
+    reviewGrid.innerHTML = `<p class="table-empty">Loading review queue...</p>`;
+    try {
+      const res = await fetch("/api/review-queue");
+      const items = await res.json();
+      renderReviewQueue(items);
+    } catch (err) {
+      reviewGrid.innerHTML = `<p class="table-empty">Error loading review queue.</p>`;
+    }
+  }
+
+  refreshReviewBtn.addEventListener("click", fetchReviewQueue);
+
+  function renderReviewQueue(items) {
+    if (!items || items.length === 0) {
+      reviewGrid.innerHTML = `<p class="table-empty">No pending images to review. Upload some in Live Inference first.</p>`;
+      return;
+    }
+
+    reviewGrid.innerHTML = items.map(item => {
+      const pred = (item.prediction || "unknown").toLowerCase();
+      const conf = ((item.confidence || 0) * 100).toFixed(1);
+      return `
+        <div class="review-card" data-saved-as="${item.saved_as}">
+          <img src="${item.image_url}" alt="Incoming pothole image" class="review-card-img" />
+          <div class="review-card-body">
+            <div>
+              <span class="severity-badge ${pred}" style="font-size:0.75rem; padding:4px 10px;">${pred.toUpperCase()}</span>
+              <span class="review-card-conf">${conf}% confidence</span>
+            </div>
+            <p class="review-card-label">Confirm correct label:</p>
+            <div class="review-card-actions">
+              <button class="btn btn-outline review-btn" data-label="low">Low</button>
+              <button class="btn btn-outline review-btn" data-label="medium">Medium</button>
+              <button class="btn btn-outline review-btn" data-label="high">High</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    // Wire up each card's three buttons
+    document.querySelectorAll(".review-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const card = e.target.closest(".review-card");
+        const savedAs = card.dataset.savedAs;
+        const label = e.target.dataset.label;
+        await submitReview(savedAs, label, card);
+      });
+    });
+  }
+
+  async function submitReview(savedAs, label, cardEl) {
+    try {
+      const res = await fetch("/api/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saved_as: savedAs, confirmed_label: label })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      cardEl.remove(); // Instantly remove the reviewed card from view
+    } catch (err) {
+      alert(`Failed to submit review: ${err.message}`);
+    }
   }
 
 });

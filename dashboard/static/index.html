@@ -58,6 +58,9 @@
       <button class="nav-tab" data-tab="tab-logs">
         Prediction History
       </button>
+      <button class="nav-tab" data-tab="tab-review">
+        Review Queue
+      </button>
       <a href="http://localhost:5000" target="_blank" class="mlflow-nav-link" title="Open MLflow Experiments UI">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -218,6 +221,22 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 4: REVIEW QUEUE -->
+    <main class="tab-content" id="tab-review">
+      <div class="card">
+        <div class="table-header">
+          <div>
+            <h2 class="card-title">Human-in-the-Loop Review</h2>
+            <p class="card-subtitle">Confirm or correct model predictions to promote images into the training set</p>
+          </div>
+          <button class="btn btn-outline" id="refreshReviewBtn">Refresh Queue</button>
+        </div>
+        <div class="review-grid" id="reviewGrid">
+          <p class="table-empty">Loading review queue...</p>
         </div>
       </div>
     </main>
